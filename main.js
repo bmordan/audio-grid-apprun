@@ -1,4 +1,4 @@
-let context, worker, animate;
+let context, worker, analyser, audioArray;
 
 const FREQUENCIES = [
     [1047.0, 1319, 1568, 1760],
@@ -27,7 +27,8 @@ const playNotes = notes => {
     notes.filter(n => n).map(freq => {
         const o = context.createOscillator()
         o.frequency.value = Number(freq)
-        o.connect(context.destination)
+        o.connect(analyser)
+        analyser.connect(context.destination)
         o.start()
         o.stop(context.currentTime + .25)
     })
@@ -69,7 +70,9 @@ const view = state => `
     <aside class="white flex flex-column justify-between">
         <h2 class="mb2 tr w-100">Audio Tracks</h2>
         <section class="overflow-scroll">${view_tracks(state)}</section>
-        <section><canvas id="canvas" width="100%" height="200px"></canvas></section>
+        <section>
+            <canvas id="canvas" width="400" height="200"></canvas>
+        </section>
     </aside>
     <nav>
         ${state.loadedTrack 
@@ -83,18 +86,21 @@ const view = state => `
 
 const update = {
     play: state => {
-        if (!context) { context = new AudioContext() }
+        if (!context) {
+            context = new AudioContext()
+            analyser = context.createAnalyser()
+            audioArray = new Uint8Array(analyser.frequencyBinCount)
+        }
         worker = new Worker('worker.js')
         worker.onmessage = msg => app.run('tick', msg)
         worker.postMessage('start')
-        animate = true
+        draw()
         return Object.assign({}, state, {playing: true})
     },
     stop: state => {
         worker.postMessage('stop')
         worker.terminate()
         worker = undefined
-        animate = false
         return Object.assign({}, state, {
             playing: false,
             bar: 0,
@@ -122,8 +128,6 @@ const update = {
             worker.terminate()
             worker = undefined
         }
-
-        animate = false
 
         return Object.assign({}, state, {
             playing: false,
@@ -153,7 +157,11 @@ const update = {
         return Object.assign({}, state, { tracks })
     },
     load: (state, trackname) => {
-        if (!context) { context = new AudioContext() }
+        if (!context) {
+            context = new AudioContext()
+            analyser = context.createAnalyser()
+            audioArray = new Uint8Array(analyser.frequencyBinCount)
+        }
 
         let track = []
         let bar = 0
@@ -179,7 +187,7 @@ const update = {
         return Object.assign({}, state, {loadedTrack, trackname, grid, bar: 0})
     },
     playLoaded: state => {
-        if (!state.loadedTrack.length) { // track has finished playing
+        if (!state.loadedTrack) { // track has finished playing
             return Object.assign({}, state, {
                 grid: [
                     [null, null, null, null],
@@ -226,7 +234,7 @@ app.start("audio-grid", state, view, update)
   ## ##  ####### ######   #####  #######  #####  #    # #######    #     #####  
 */
 
-const ws = new WebSocket('ws://localhost:3000/socket')
+const ws = new WebSocket('ws://fathomless-reaches-81353.herokuapp.com/socket')
 
 ws.onmessage = ({data}) => {
     if (data === 'collect') {
@@ -254,12 +262,21 @@ ws.onmessage = ({data}) => {
 */
 
 const canvas = document.getElementById("canvas")
-const brush = canvas.getContext("2d")
-brush.fillStyle = "#ffb700"
+const c = canvas.getContext("2d")
 const w = canvas.getAttribute("width")
 const h = canvas.getAttribute("height")
-const radians = degree => (Math.PI/180) * degree
+c.fillStyle = "#ff4136"
+
 const draw = () => {
-    if (!state.playing) return requestAnimationFrame(draw)
-    console.log("OK animate")
+    requestAnimationFrame(draw)
+    if (analyser) {
+        analyser.getByteFrequencyData(audioArray)
+        c.clearRect(0, 0, w, h)
+        const barWidth = w / audioArray.length
+        audioArray.reduce((x, barHeight) => {
+            c.fillRect(x, h-barHeight/2, barWidth, barHeight/2)
+            return x + barWidth + 1
+        }, 0)
+    }
 }
+draw()
