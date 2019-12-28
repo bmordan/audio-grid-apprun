@@ -1,12 +1,11 @@
-let context, worker;
+let context, worker, animate;
+
 const FREQUENCIES = [
     [1047.0, 1319, 1568, 1760],
     [523.3, 659.3, 784.0, 880.0],
     [261.6, 329.6, 392.0, 440.0],
     [130.8, 164.8, 196.0, 220.0]
 ]
-
-const ws = new WebSocket('ws://localhost:3000/socket')
 
 const state = {
     playing: false,
@@ -22,6 +21,16 @@ const state = {
     loadedTrack: null,
     modal: false,
     trackname: ""
+}
+
+const playNotes = notes => {
+    notes.filter(n => n).map(freq => {
+        const o = context.createOscillator()
+        o.frequency.value = Number(freq)
+        o.connect(context.destination)
+        o.start()
+        o.stop(context.currentTime + .25)
+    })
 }
 
 const view_grid = state => state.grid.map((row, rowIndex) => {
@@ -57,9 +66,10 @@ const view_tracks = state => Object.keys(state.tracks).map(trackname => {
 
 const view = state => `
     <section class="grid">${view_grid(state)}</section>
-    <aside class="white">
+    <aside class="white flex flex-column justify-between">
         <h2 class="mb2 tr w-100">Audio Tracks</h2>
-        ${view_tracks(state)}
+        <section class="overflow-scroll">${view_tracks(state)}</section>
+        <section><canvas id="canvas" width="100%" height="200px"></canvas></section>
     </aside>
     <nav>
         ${state.loadedTrack 
@@ -71,28 +81,20 @@ const view = state => `
     </nav>
     ${state.modal ? view_modal(state) : ""}`
 
-const playNotes = notes => {
-    notes.filter(n => n).map(freq => {
-        const o = context.createOscillator()
-        o.frequency.value = Number(freq)
-        o.connect(context.destination)
-        o.start()
-        o.stop(context.currentTime + .25)
-    })
-}
-
 const update = {
     play: state => {
         if (!context) { context = new AudioContext() }
         worker = new Worker('worker.js')
         worker.onmessage = msg => app.run('tick', msg)
         worker.postMessage('start')
+        animate = true
         return Object.assign({}, state, {playing: true})
     },
     stop: state => {
         worker.postMessage('stop')
         worker.terminate()
         worker = undefined
+        animate = false
         return Object.assign({}, state, {
             playing: false,
             bar: 0,
@@ -120,6 +122,8 @@ const update = {
             worker.terminate()
             worker = undefined
         }
+
+        animate = false
 
         return Object.assign({}, state, {
             playing: false,
@@ -212,6 +216,18 @@ const update = {
 
 app.start("audio-grid", state, view, update)
 
+/*
+ #     # ####### ######   #####  #######  #####  #    # ####### #######  #####  
+ #  #  # #       #     # #     # #     # #     # #   #  #          #    #     # 
+ #  #  # #       #     # #       #     # #       #  #   #          #    #       
+ #  #  # #####   ######   #####  #     # #       ###    #####      #     #####  
+ #  #  # #       #     #       # #     # #       #  #   #          #          # 
+ #  #  # #       #     # #     # #     # #     # #   #  #          #    #     # 
+  ## ##  ####### ######   #####  #######  #####  #    # #######    #     #####  
+*/
+
+const ws = new WebSocket('ws://localhost:3000/socket')
+
 ws.onmessage = ({data}) => {
     if (data === 'collect') {
         ws.send(localStorage.getItem('tracks') || "{}")
@@ -225,4 +241,25 @@ ws.onmessage = ({data}) => {
         }
         app.run('tracks', newTracks)
     }
+}
+
+/*
+  #####     #    #     # #     #    #     #####     
+ #     #   # #   ##    # #     #   # #   #     #    
+ #        #   #  # #   # #     #  #   #  #          
+ #       #     # #  #  # #     # #     #  #####     
+ #       ####### #   # #  #   #  #######       #    
+ #     # #     # #    ##   # #   #     # #     #    
+  #####  #     # #     #    #    #     #  #####  
+*/
+
+const canvas = document.getElementById("canvas")
+const brush = canvas.getContext("2d")
+brush.fillStyle = "#ffb700"
+const w = canvas.getAttribute("width")
+const h = canvas.getAttribute("height")
+const radians = degree => (Math.PI/180) * degree
+const draw = () => {
+    if (!state.playing) return requestAnimationFrame(draw)
+    console.log("OK animate")
 }
