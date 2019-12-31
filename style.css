@@ -27,12 +27,6 @@ header {
 #audio-grid {
     flex: 1 1 auto; min-width: 0; /* 1 */ min-height: 0; /* 1 */
     display: grid;
-    grid-template-areas:
-        'grid aside'
-        'grid aside'
-        'nav aside'
-    ;
-    grid-area: main;
     background-color: var(--mustard);
 }
 #audio-grid .grid {
@@ -46,7 +40,6 @@ header {
 }
 #audio-grid nav {
     padding: 1rem;
-    grid-area: nav;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -59,7 +52,6 @@ header {
 }
 aside {
     padding: 1rem;
-    grid-area: aside;
     background-color: var(--green);
 }
 footer {

@@ -67,12 +67,12 @@ const view_tracks = state => Object.keys(state.tracks).map(trackname => {
 
 const view = state => `
     <section class="grid">${view_grid(state)}</section>
+    <section class="relative" id="canvas-container">
+        <canvas id="canvas"></canvas>
+    </section>
     <aside class="white flex flex-column justify-between">
         <h2 class="mb2 tr w-100">Audio Tracks</h2>
         <section class="overflow-scroll">${view_tracks(state)}</section>
-        <section>
-            <canvas id="canvas" width="400" height="200"></canvas>
-        </section>
     </aside>
     <nav>
         ${state.loadedTrack 
@@ -187,7 +187,7 @@ const update = {
         return Object.assign({}, state, {loadedTrack, trackname, grid, bar: 0})
     },
     playLoaded: state => {
-        if (!state.loadedTrack) { // track has finished playing
+        if (!state.loadedTrack.length) { // track has finished playing
             return Object.assign({}, state, {
                 grid: [
                     [null, null, null, null],
@@ -262,6 +262,11 @@ ws.onmessage = ({data}) => {
 */
 
 const canvas = document.getElementById("canvas")
+const canvasContainer = document.getElementById("canvas-container")
+canvas.style.width = "100%"
+canvas.style.height = "100%"
+canvas.width = canvasContainer.offsetWidth
+canvas.height = canvasContainer.offsetHeight
 const c = canvas.getContext("2d")
 const w = canvas.getAttribute("width")
 const h = canvas.getAttribute("height")
